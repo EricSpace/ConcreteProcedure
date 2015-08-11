@@ -1,0 +1,125 @@
+CREATE OR REPLACE PROCEDURE sp_soBindInfo(v_instr IN VARCHAR2 DEFAULT NULL,
+                                          --v_table IN VARCHAR2 DEFAULT NULL,
+                                          v_outstr out varchar2) as
+  ----------解析传入的Json对象示例脚本----------
+  jsonObj     json;
+  ls_userid   varchar2(20);
+  ls_soidall  varchar2(200);
+  ls_soid     varchar2(10);
+  ls_custname varchar2(100);
+  ls_projname varchar2(100);
+  ls_errCode  varchar2(2);
+  ls_errMsg   varchar2(100);
+  ls_status   char(1);
+  obj3        json_list;
+  obj4        json;
+  obj5        json;
+  outstr      varchar2(2000);
+  scanner_exception exception;
+  pragma exception_init(scanner_exception, -20100);
+  parser_exception exception;
+  pragma exception_init(parser_exception, -20101);
+  procedure p(v varchar2) as
+  begin
+    dbms_output.put_line(null);
+    dbms_output.put_line(v);
+  end;
+begin
+  jsonObj   := json(v_instr);
+  ls_userid := json_ext.get_string(jsonObj, 'userId');
+  -- ls_pwd    := json_ext.get_string(jsonObj, 'userPwd');
+  begin
+    select soidall
+      into ls_soidall
+      from usermaster_pad
+     where userid = ls_userid;
+    ls_errCode := '0';
+    ls_errMsg  := '查询成功';
+  exception
+    WHEN NO_DATA_FOUND THEN
+      ls_soidall := '';
+      ls_errCode := '-1';
+      ls_errMsg  := '查询合同号失败，请稍后再试！';
+  end;
+  begin
+    if length(ls_soidall) > 0 then
+    
+      --p('construct the json list:');
+    
+      obj3 := json_list();
+      loop
+        if instr(ls_soidall, ',') > 0 then
+          ls_soid    := substr(ls_soidall, 1, instr(ls_soidall, ',') - 1);
+          ls_soidall := substr(ls_soidall, instr(ls_soidall, ',') + 1);
+--        else
+--          ls_soid := ls_soidall;
+--        end if;
+        begin
+          select status, custname, realcustomer
+            into ls_status, ls_custname, ls_projname
+            from so
+           where soid = ls_soid
+             and rownum = 1;
+        exception
+          WHEN NO_DATA_FOUND THEN
+            ls_status := '';
+        end;
+        if ls_status = ' ' then
+          ls_errCode := '-1';
+          ls_errMsg  := '查询合同号失败，该用户未指定可用销售合同！';
+        else
+          if ls_status = '1' then
+            obj4 := json();
+--            obj4.put('socode', ls_soid);
+            obj4.put('soCode', ls_soid);
+            obj4.put('customerName', ls_custname);
+            obj4.put('projectName', ls_projname);
+            obj3.append(obj4.to_json_value);
+          end if;
+        end if;
+        end if; --与第一个if对应，否则当用户只有一条合同时，返回的结果集为2条
+        if instr(ls_soidall, ',') = 0 then
+          ls_soid := ls_soidall;
+          begin
+            select status, custname, realcustomer
+              into ls_status, ls_custname, ls_projname
+              from so
+             where soid = ls_soid
+               and rownum = 1;
+          exception
+            WHEN NO_DATA_FOUND THEN
+              ls_status := '';
+          end;
+          if ls_status = '1' then
+            obj4 := json();
+--          obj4.put('socode', ls_soid);
+            obj4.put('soCode', ls_soid);
+            obj4.put('customerName', ls_custname);
+            obj4.put('projectName', ls_projname);
+            obj3.append(obj4.to_json_value);
+          end if;
+          exit;
+        end if;
+      
+      end loop;
+    end if;
+  
+    obj5 := json();
+    obj5.put('errCode', ls_errCode);
+    if ls_errCode = '0' then
+      obj5.put('errMsg', ls_errMsg);
+      obj5.put('soBindInfo', obj3);
+    else
+      obj5.put('errMsg', ls_errMsg);
+--      obj5.put('userInfo', 'null');
+      obj5.put('soBindInfo', 'null');
+    end if;
+    outstr := obj5.to_char;
+  exception
+    when scanner_exception then
+      dbms_output.put_line(SQLERRM);
+    when parser_exception then
+      dbms_output.put_line(SQLERRM);
+  end;
+  v_outstr := json_unicodetochina(outstr);
+end;

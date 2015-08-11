@@ -1,0 +1,196 @@
+CREATE OR REPLACE PROCEDURE sp_basicInfo(v_instr IN VARCHAR2 DEFAULT NULL,
+                                          --v_table IN VARCHAR2 DEFAULT NULL,
+                                          v_outstr out varchar2) as
+  ----------解析传入的Json对象示例脚本----------
+  jsonObj     json;
+  ls_type   varchar2(20);
+  ls_codeid  varchar2(20);
+  ls_name     varchar2(100);
+  ls_errCode  varchar2(2);
+  ls_errMsg   varchar2(100);
+  ls_status   varchar(10);
+  li_count    int;
+  i int;
+  obj3        json_list;
+  obj4        json;
+  obj5        json;
+  outstr      varchar2(4000);
+    TYPE REF_codetype	IS REF CURSOR;
+	code_type	REF_codetype;
+  scanner_exception exception;
+  pragma exception_init(scanner_exception, -20100);
+  parser_exception exception;
+  pragma exception_init(parser_exception, -20101);
+  procedure p(v varchar2) as
+  begin
+    dbms_output.put_line(null);
+    dbms_output.put_line(v);
+  end;
+begin
+  jsonObj   := json(v_instr);
+  ls_type := json_ext.get_string(jsonObj, 'type');
+  -- ls_pwd    := json_ext.get_string(jsonObj, 'userPwd');
+  obj3 := json_list();
+  if ls_type='CP' THEN--产品
+     select count(*) into li_count from bom_concrete ;
+     if li_count >0 then 
+         OPEN code_type FOR
+        	SELECT prodid,prodid as name,'正常' from bom_concrete ORDER BY prodid ASC ;
+        FETCH  code_type INTO ls_codeid, ls_name,ls_status;
+        WHILE  (  code_type%FOUND  )  
+        LOOP
+            if ls_status = '正常' then
+              obj4 := json();
+              obj4.put('code', ls_codeid);
+              obj4.put('name', ls_name);
+              obj4.put('status', ls_status);
+              obj3.append(obj4.to_json_value);
+            end if;
+        	FETCH  code_type INTO ls_codeid, ls_name,ls_status;
+        END LOOP;
+        CLOSE code_type;
+        ls_errCode := '0';
+        ls_errMsg  := '查询成功';
+      else
+         ls_errCode := '-1';
+         ls_errMsg  := '未查询到产品明细';
+      end if ;
+  else 
+    if ls_type='SGCM' THEN--施工层面
+     select count(*) into li_count from c_prolayer  where length(nvl(position,''))>0 ;
+     if li_count >0 then 
+        i:=1;
+         OPEN code_type FOR
+          select codeid,codename,'正常'
+              from c_prolayer where length(nvl(position,''))>0  ORDER BY substr('000'||position,length('000'||position) - 2 ,3);
+          
+        FETCH  code_type INTO ls_codeid, ls_name,ls_status;
+        WHILE  (  code_type%FOUND  )  and i<25 
+        LOOP
+            if ls_status = '正常' then
+              obj4 := json();
+              obj4.put('code', ls_codeid);
+              obj4.put('name', ls_name);
+              obj4.put('status', ls_status);
+              obj3.append(obj4.to_json_value);
+            end if;
+            i:=i+1;
+        	FETCH  code_type INTO ls_codeid, ls_name,ls_status;
+        END LOOP;
+        CLOSE code_type;
+        ls_errCode := '0';
+        ls_errMsg  := '查询成功';
+      else
+         ls_errCode := '-1';
+         ls_errMsg  := '未查询到产品明细';
+      end if ;
+     else
+        if ls_type='JZFS' THEN--浇注方式
+         select count(*) into li_count from C_CUSTOMCLASS;
+         if li_count >0 then 
+            i:=1;
+             OPEN code_type FOR
+              select codeid,CHname,'正常'
+                  from C_CUSTOMCLASS;
+              
+            FETCH  code_type INTO ls_codeid, ls_name,ls_status;
+            WHILE  (  code_type%FOUND  ) -- and i<25 
+            LOOP
+                if ls_status = '正常' then
+                  obj4 := json();
+                  obj4.put('code', ls_codeid);
+                  obj4.put('name', ls_name);
+                  obj4.put('status', ls_status);
+                  obj3.append(obj4.to_json_value);
+                end if;
+                i:=i+1;
+            	FETCH  code_type INTO ls_codeid, ls_name,ls_status;
+            END LOOP;
+            CLOSE code_type;
+            ls_errCode := '0';
+            ls_errMsg  := '查询成功';
+          else
+             ls_errCode := '-1';
+             ls_errMsg  := '未查询到产品明细';
+          end if ;
+        ELSE
+           IF ls_type='TLD' THEN--塌落度
+             select count(*) into li_count from C_PURFEE;
+             if li_count >0 then 
+                i:=1;
+                 OPEN code_type FOR
+                  select codeid,CHname,'正常'
+                      from C_PURFEE;
+                FETCH  code_type INTO ls_codeid, ls_name,ls_status;
+                WHILE  (  code_type%FOUND  )  --and i<25 
+                LOOP
+                    if ls_status = '正常' then
+                      obj4 := json();
+                      obj4.put('code', ls_codeid);
+                      obj4.put('name', ls_name);
+                      obj4.put('status', ls_status);
+                      obj3.append(obj4.to_json_value);
+                    end if;
+                    i:=i+1;
+                	FETCH  code_type INTO ls_codeid, ls_name,ls_status;
+                END LOOP;
+                CLOSE code_type;
+                ls_errCode := '0';
+                ls_errMsg  := '查询成功';
+              else
+                 ls_errCode := '-1';
+                 ls_errMsg  := '未查询到产品明细';
+              end if ;
+           else
+              if ls_type='JJYS' THEN--加价因素
+                 select count(*) into li_count from c_addprice where pricetype ='so' ;
+                 if li_count >0 then 
+                    i:=1;
+                     OPEN code_type FOR
+                     select postid,chname,'正常' from c_addprice where pricetype ='so' order by postid ;
+                    FETCH  code_type INTO ls_codeid, ls_name,ls_status;
+                    WHILE  (  code_type%FOUND  )  and i<25 
+                    LOOP
+                        if ls_status = '正常' then
+                          obj4 := json();
+                          obj4.put('code', ls_codeid);
+                          obj4.put('name', ls_name);
+                          obj4.put('status', ls_status);
+                          obj3.append(obj4.to_json_value);
+                        end if;
+                        i:=i+1;
+                    	FETCH  code_type INTO ls_codeid, ls_name,ls_status;
+                    END LOOP;
+                    CLOSE code_type;
+                    ls_errCode := '0';
+                    ls_errMsg  := '查询成功';
+                  else
+                     ls_errCode := '-1';
+                     ls_errMsg  := '未查询到产品明细';
+                  end if ;
+                end if ;
+           END IF;
+      end if ;
+     end if;
+  END IF ;
+  begin
+    obj5 := json();
+    obj5.put('errCode', ls_errCode);
+    if ls_errCode = '0' then
+      obj5.put('errMsg', ls_errMsg);
+      obj5.put('type', ls_type);
+      obj5.put('basicInfo', obj3);
+    else
+      obj5.put('errMsg', ls_errMsg);
+      obj5.put('type', ls_type);
+      obj5.put('basicInfo', 'null');
+    end if;
+    outstr := obj5.to_char;
+  exception
+    when scanner_exception then
+      dbms_output.put_line(SQLERRM);
+    when parser_exception then
+      dbms_output.put_line(SQLERRM);
+  end;
+  v_outstr := json_unicodetochina(outstr);
+end;

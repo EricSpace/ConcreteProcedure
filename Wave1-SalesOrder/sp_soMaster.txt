@@ -1,0 +1,81 @@
+CREATE OR REPLACE PROCEDURE sp_soMaster(v_instr IN VARCHAR2 DEFAULT NULL,
+                                        --v_table IN VARCHAR2 DEFAULT NULL,
+                                        v_outstr out varchar2) as
+  ----------解析传入的Json对象示例脚本----------
+  jsonObj      json;
+  ls_soid    varchar2(20);
+  ls_customerCode varchar2(10);
+  ls_customerName varchar2(100);
+  ls_projectCode varchar2(10);
+  ls_projectName varchar2(100);
+  ls_status char(1);
+  ldt_contractDate varchar2(20); 
+  ldt_startDeliverDate varchar2(20);
+  ldt_endDeliverDate varchar2(20);
+  ls_projectMaster varchar2(20);
+  ls_salesCode  varchar2(20);
+  ls_salesName varchar2(20);
+  ls_errCode   varchar2(2);
+  ls_errMsg    varchar2(100);
+--  obj3         json_list;
+  obj4         json;
+  obj5         json;
+  outstr       varchar2(4000);
+  scanner_exception exception;
+  pragma exception_init(scanner_exception, -20100);
+  parser_exception exception;
+  pragma exception_init(parser_exception, -20101);
+  procedure p(v varchar2) as
+  begin
+    dbms_output.put_line(null);
+    dbms_output.put_line(v);
+  end;
+begin
+  jsonObj := json(v_instr);
+  ls_soid := json_ext.get_string(jsonObj, 'soCode');
+  begin
+    select custid,custname,realcustid,realcustname,status,to_char(indate,'yyyy-mm-dd'),to_char(delidate,'yyyy-mm-dd'),
+     to_char(delidateto,'yyyy-mm-dd'),nhhcustomer,salesid,sales
+     into ls_customerCode,ls_customerName,ls_projectCode,ls_projectName,ls_status,ldt_contractDate,ldt_startDeliverDate,ldt_endDeliverDate,ls_projectMaster,
+     ls_salesCode,ls_salesName from so where soid = ls_soid and rownum = 1 ;
+    ls_errCode := '0';
+    ls_errMsg  := '查询成功';
+  exception
+    WHEN NO_DATA_FOUND THEN
+      ls_errCode := '-1';
+      ls_errMsg  := '注意：不存在合同号为'||ls_soid||'的合同';
+  end;
+  begin
+    -- p('construct the json list:');
+    obj4 := json();
+    obj4.put('socode', ls_soid);
+    obj4.put('customerCode', ls_customerCode);
+    obj4.put('customerName', ls_customerName);
+    obj4.put('projectCode', ls_projectCode);
+    obj4.put('projectName', ls_projectName);
+    obj4.put('status', ls_status);
+    obj4.put('contractDate', ldt_contractDate);
+    obj4.put('startDeliverDate', ldt_startDeliverDate);
+    obj4.put('endDeliverDate', ldt_endDeliverDate);
+    obj4.put('projectMaster', ls_projectMaster);
+    obj4.put('salesCode', ls_salesCode);
+    obj4.put('salesName', ls_salesName);
+
+    obj5 := json();
+    obj5.put('errCode', ls_errCode);
+    if ls_errCode = '0' then
+      obj5.put('errMsg', ls_errMsg);
+      obj5.put('soMaster', obj4);
+    else
+      obj5.put('errMsg', ls_errMsg);
+      obj5.put('soMaster', 'null');
+    end if;
+    outstr := obj5.to_char;
+  exception
+    when scanner_exception then
+      dbms_output.put_line(SQLERRM);
+    when parser_exception then
+      dbms_output.put_line(SQLERRM);
+  end;
+  v_outstr := json_unicodetochina(outstr);
+end;

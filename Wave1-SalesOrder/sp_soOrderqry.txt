@@ -1,6 +1,6 @@
 CREATE OR REPLACE PROCEDURE sp_soOrderqry(v_instr IN VARCHAR2 DEFAULT NULL,
                                           --v_table IN VARCHAR2 DEFAULT NULL,
-                                          v_outstr out long) as
+                                          v_outstr out clob) as
   ----------解析传入的Json对象示例脚本----------
   jsonObj     json;
   ls_soid   varchar2(10);

@@ -1,0 +1,12 @@
+CREATE OR REPLACE FUNCTION json_unicodetochina
+(	v_instr IN VARCHAR2 DEFAULT NULL
+)
+RETURN VARCHAR2
+IS
+----------解析传入的Json对象示例脚本----------
+  v_outstr varchar2(4000);
+begin
+  
+  SELECT unistr(REPLACE(v_instr,'\u','\')) into v_outstr FROM dual; 
+  return v_outstr;  
+end;

@@ -1,0 +1,66 @@
+/* 调用ws生成送货小票二维码图片*/
+CREATE OR REPLACE PROCEDURE sp_generate_qrcode as
+ req               UTL_HTTP.REQ;
+  resp              UTL_HTTP.RESP;
+  respJsonObj       json;
+  v_text            varchar2(4000);
+  v_url             varchar2(1000);
+  data              varchar2(1024);
+  encode_data       varchar2(1024);
+  req_json          json;
+  v_image_file_name varchar2(100);
+  v_qrcode_url      varchar2(100);
+  ls_errCode        varchar2(10);
+  ls_errMsg         varchar2(100);
+
+begin
+--这个存储过程的入参形式你确认一下，需要的参数请参见接口文档
+  req_json := json();
+  req_json.put('channel', 'scu');
+  req_json.put('subChannel', 'webapp');
+  req_json.put('companyId', 'R001');
+  req_json.put('delOrderNo', '000009');
+
+  data        := req_json.to_char;
+  encode_data := utl_encode.text_encode(data);
+  dbms_output.put_line('encode data: ' || encode_data);
+
+  v_url := 'http://localhost:8080/ConcreteWebService/rs/qrcode/generate'; --这个地址可以考虑放到一个表中维护
+  req   := UTL_HTTP.BEGIN_REQUEST(v_url, 'POST', utl_http.HTTP_VERSION_1_1);
+
+  utl_http.set_header(req, 'Cache-Control', 'no-cache');
+  utl_http.set_header(req, 'Content-Type', 'application/json');
+  utl_http.set_header(req, 'Content-Length', length(data));
+  UTL_HTTP.WRITE_TEXT(req, data);
+  resp := UTL_HTTP.GET_RESPONSE(req);
+
+  dbms_output.put_line('STATUS CODE: ' || resp.status_code);
+
+  if (resp.status_code = '200') then
+    begin
+      utl_http.read_text(resp, v_text);
+      dbms_output.put_line('v_text:' || json_unicodetochina(v_text));
+    
+      respJsonObj       := json(v_text);
+      ls_errCode        := json_ext.get_string(respJsonObj, 'errCode');
+      ls_errMsg         := json_ext.get_string(respJsonObj, 'errMsg');
+      v_image_file_name := json_ext.get_string(respJsonObj, 'imageFileName');
+      v_qrcode_url      := json_ext.get_string(respJsonObj, 'qrCodeUrl');
+    
+      dbms_output.put_line('ls_errCode:' || ls_errCode || ' ls_errMsg"' ||
+                           ls_errMsg || ' v_image_file_name:' ||
+                           v_image_file_name || ' v_qrcode_url:' ||
+                           v_qrcode_url);
+    
+      if (ls_errCode = '0') then
+        -- to do 
+        --添加   送货小票上增加字段存放qrcodeurl，以在二维码扫描时进行数据对应，并将获取的qrcodeurl的值更新上去
+        dbms_output.put_line('请在这里添加上述相关代码');
+      end if;
+    end;
+  end if;
+
+EXCEPTION
+  WHEN utl_http.end_of_body THEN
+    utl_http.end_response(resp);
+end;
